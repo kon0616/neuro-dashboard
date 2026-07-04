@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { TrendingUp, Calendar, Clock } from 'lucide-react';
+// lucide icons used inline via dynamic lookup
 import { getAllSessions, getDaysInRange, getBehaviorDefinitions } from '../../lib/storage';
 import { getToday, formatDate } from '../../lib/utils';
 

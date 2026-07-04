@@ -1,4 +1,4 @@
-import { Cpu, Battery, Radio, Thermometer, Moon, Calendar, Tag } from 'lucide-react';
+import { Moon, Calendar, Tag } from 'lucide-react';
 import type { DayRecord } from '../../types/day';
 import { periodLabels } from '../../types/session';
 
@@ -23,16 +23,7 @@ export function Observer({ day }: ObserverProps) {
   const sessions = day.sessions;
   const events = day.events;
 
-  // 计算趋势方向（第一个会话 vs 最后一个）
-  const first = sessions[0];
-  const last = sessions[sessions.length - 1];
-  const trend = (firstVal: number, lastVal: number): '↑' | '↓' | '→' => {
-    if (lastVal > firstVal) return '↑';
-    if (lastVal < firstVal) return '↓';
-    return '→';
-  };
-
-  const totalSensory = (s: typeof first) =>
+  const totalSensory = (s: (typeof sessions)[0]) =>
     s.sensory.soundOverload + s.sensory.lightOverload + s.sensory.socialOverload + s.sensory.infoOverload;
 
   // 收集行为

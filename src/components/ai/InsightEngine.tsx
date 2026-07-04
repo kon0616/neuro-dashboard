@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Brain, Zap, RefreshCw, AlertTriangle, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { useBaseline } from '../../hooks/useBaseline';
 import { useConfig } from '../../hooks/useConfig';
-import { getAllSessions, getDaysInRange } from '../../lib/storage';
+import { getAllSessions } from '../../lib/storage';
 import { normalizeUrl } from '../../lib/utils';
 
 type InsightLevel = 'causal' | 'behavioral' | 'transition' | 'personal_model';
@@ -57,7 +57,6 @@ export function InsightEngine() {
 
     try {
       const allSessions = getAllSessions();
-      const days = getDaysInRange(90);
 
       // 包含全部四个层级的系统提示词
       const systemPrompt = `You are a Pattern Detection Engine. You are NOT a therapist, NOT a psychologist, NOT a doctor.
