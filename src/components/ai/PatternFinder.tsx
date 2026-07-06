@@ -1,7 +1,5 @@
 import { useState, useMemo } from 'react';
-// lucide icons used inline via dynamic lookup
-import { getAllSessions, getDaysInRange, getBehaviorDefinitions } from '../../lib/storage';
-import { getToday, formatDate } from '../../lib/utils';
+import { getAllSessions } from '../../lib/storage';
 
 type TimeScale = 3 | 7 | 30 | 90 | -1; // -1 = All Time
 
@@ -90,78 +88,146 @@ export function PatternFinder() {
 
 // === 本地模式检测函数 ===
 
-/** 3天：短期连续变化 */
-function findShortTermPatterns(): Pattern[] {
-  const sessions = getAllSessions();
-  if (sessions.length < 3) return [];
-
+/** 日常指标平均 */
+function dailyAvgSessions(sessions: ReturnType<typeof getAllSessions>) {
   const byDate = new Map<string, typeof sessions>();
   sessions.forEach((s) => {
     const d = s.timestamp.slice(0, 10);
     if (!byDate.has(d)) byDate.set(d, []);
     byDate.get(d)!.push(s);
   });
+  const dates = [...byDate.keys()].sort();
+  return dates.map((d) => {
+    const ss = byDate.get(d)!;
+    const n = ss.length;
+    return {
+      date: d,
+      sessions: n,
+      thinkingSpeed: ss.reduce((s, r) => s + r.brain.thinkingSpeed, 0) / n,
+      energy: ss.reduce((s, r) => s + r.body.energy, 0) / n,
+      sensory: ss.reduce((s, r) => s + r.sensory.soundOverload + r.sensory.lightOverload + r.sensory.socialOverload + r.sensory.infoOverload, 0) / n,
+      tension: ss.reduce((s, r) => s + r.body.physicalTension, 0) / n,
+      behaviors: [...new Set(ss.flatMap((s) => Object.entries(s.behavior).filter(([, v]) => v).map(([k]) => k)))],
+    };
+  });
+}
 
-  const dates = [...byDate.keys()].sort().slice(-3);
-  if (dates.length < 3) return [];
+/** 3天：短期连续变化 */
+function findShortTermPatterns(): Pattern[] {
+  const sessions = getAllSessions();
+  const daily = dailyAvgSessions(sessions);
+  if (daily.length < 3) return [];
 
   const patterns: Pattern[] = [];
-  const today = getToday();
-  if (!dates.includes(today)) return patterns;
+  const recent = daily.slice(-3); // 最近有数据的3天
+  const d0 = recent[0], d1 = recent[1], d2 = recent[2];
 
-  // 检测连续变化
-  const avgThinking = dates.map((d) => {
-    const ss = byDate.get(d)!;
-    return ss.reduce((sum, s) => sum + s.brain.thinkingSpeed, 0) / ss.length;
-  });
-
-  if (avgThinking[2] > avgThinking[0] + 1) {
+  // 思考速度连续变化（≥1 即触发）
+  const cpuChange = d2.thinkingSpeed - d0.thinkingSpeed;
+  if (cpuChange >= 1) {
     patterns.push({
       type: 'short_term',
       title: '思考速度持续上升',
-      description: `过去3天思考速度从 ${avgThinking[0].toFixed(1)} 升至 ${avgThinking[2].toFixed(1)}`,
+      description: `从 ${d0.date} 到 ${d2.date}，思考速度从 ${d0.thinkingSpeed.toFixed(1)} 升至 ${d2.thinkingSpeed.toFixed(1)}。共 ${recent.reduce((s, d) => s + d.sessions, 0)} 次签到。`,
+    });
+  } else if (cpuChange <= -1) {
+    patterns.push({
+      type: 'short_term',
+      title: '思考速度持续下降',
+      description: `从 ${d0.date} 到 ${d2.date}，思考速度从 ${d0.thinkingSpeed.toFixed(1)} 降至 ${d2.thinkingSpeed.toFixed(1)}。`,
     });
   }
 
-  const yesterday = sessions.filter((s) => s.timestamp.slice(0, 10) === dates[1]);
-  const todaySess = sessions.filter((s) => s.timestamp.slice(0, 10) === dates[2]);
-  if (yesterday.length > 0 && todaySess.length > 0) {
-    const yAvgEnergy = yesterday.reduce((s, r) => s + r.body.energy, 0) / yesterday.length;
-    const tAvgEnergy = todaySess.reduce((s, r) => s + r.body.energy, 0) / todaySess.length;
-    if (tAvgEnergy < yAvgEnergy - 1) {
-      patterns.push({
-        type: 'short_term',
-        title: '精力持续下降',
-        description: `近两日精力从 ${yAvgEnergy.toFixed(1)} 降至 ${tAvgEnergy.toFixed(1)}`,
-      });
-    }
+  // 精力变化
+  const energyChange = d2.energy - d0.energy;
+  if (energyChange >= 1) {
+    patterns.push({
+      type: 'short_term',
+      title: '精力回升',
+      description: `从 ${d0.date} 到 ${d2.date}，精力从 ${d0.energy.toFixed(1)} 升至 ${d2.energy.toFixed(1)}。`,
+    });
+  } else if (energyChange <= -1) {
+    patterns.push({
+      type: 'short_term',
+      title: '精力持续下降',
+      description: `从 ${d0.date} 到 ${d2.date}，精力从 ${d0.energy.toFixed(1)} 降至 ${d2.energy.toFixed(1)}。`,
+    });
+  }
+
+  // 感官负荷
+  const sensoryChange = d2.sensory - d0.sensory;
+  if (sensoryChange >= 3) {
+    patterns.push({
+      type: 'short_term',
+      title: '感官负荷持续上升',
+      description: `从 ${d0.date} 到 ${d2.date}，感官负荷从 ${d0.sensory.toFixed(1)} 升至 ${d2.sensory.toFixed(1)}。`,
+    });
+  }
+
+  // 无显著变化时也给出反馈
+  if (patterns.length === 0) {
+    patterns.push({
+      type: 'short_term',
+      title: '短期状态稳定',
+      description: `最近3天（${d0.date} ~ ${d2.date}）各项指标波动较小，未检测到显著的短期变化。这是正常状态——神经系统没有突然的剧烈波动。`,
+    });
   }
 
   return patterns;
 }
 
-/** 7天：趋势偏离基线 */
+/** 7天：趋势偏离 */
 function findTrendPatterns(): Pattern[] {
-  const days = getDaysInRange(7).filter((d) => d.sessions.length > 0);
-  if (days.length < 3) return [];
+  const daily = dailyAvgSessions(getAllSessions()).filter((d) => {
+    // 只看最近有数据的日子
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    return new Date(d.date) >= sevenDaysAgo;
+  });
+  if (daily.length < 3) return [];
 
   const patterns: Pattern[] = [];
 
-  // 计算7天均值
-  const dailySensory = days.map((d) => {
-    return d.sessions.reduce((sum, s) =>
-      sum + s.sensory.soundOverload + s.sensory.lightOverload + s.sensory.socialOverload + s.sensory.infoOverload, 0
-    ) / d.sessions.length;
-  });
-  const avgSensory = dailySensory.reduce((a, b) => a + b, 0) / dailySensory.length;
+  const avgCPU = daily.reduce((s, d) => s + d.thinkingSpeed, 0) / daily.length;
+  const avgEnergy = daily.reduce((s, d) => s + d.energy, 0) / daily.length;
+  const avgSensory = daily.reduce((s, d) => s + d.sensory, 0) / daily.length;
 
-  // 检查最近3天是否连续高于均值
-  const recent = dailySensory.slice(-3);
-  if (recent.every((v) => v > avgSensory)) {
+  const last3 = daily.slice(-3);
+
+  // 检查最近3天是否全面高于均值
+  const highCPU = last3.filter((d) => d.thinkingSpeed > avgCPU + 0.5).length;
+  const highSensory = last3.filter((d) => d.sensory > avgSensory + 2).length;
+  const lowEnergy = last3.filter((d) => d.energy < avgEnergy - 0.5).length;
+
+  if (highSensory >= 2) {
     patterns.push({
       type: 'trend',
       title: '感官负荷持续偏高',
-      description: `过去3天的感官负荷均高于7天平均值 (${avgSensory.toFixed(1)})`,
+      description: `过去 ${highSensory} 天感官负荷高于7天均值 ${avgSensory.toFixed(1)}。`,
+    });
+  }
+
+  if (highCPU >= 2) {
+    patterns.push({
+      type: 'trend',
+      title: '思考速度持续偏高',
+      description: `过去 ${highCPU} 天思考速度高于7天均值 ${avgCPU.toFixed(1)}。`,
+    });
+  }
+
+  if (lowEnergy >= 2) {
+    patterns.push({
+      type: 'trend',
+      title: '精力持续偏低',
+      description: `过去 ${lowEnergy} 天精力低于7天均值 ${avgEnergy.toFixed(1)}。`,
+    });
+  }
+
+  if (patterns.length === 0) {
+    patterns.push({
+      type: 'trend',
+      title: '趋势平稳',
+      description: `过去7天（${daily.length} 天数据）各指标在正常范围内波动，未检测到明显的持续性偏离。`,
     });
   }
 
@@ -170,32 +236,56 @@ function findTrendPatterns(): Pattern[] {
 
 /** 30天：关联规则 */
 function findCorrelationPatterns(): Pattern[] {
-  const days = getDaysInRange(30).filter((d) => d.sessions.length > 0);
-  if (days.length < 14) return [];
+  const daily = dailyAvgSessions(getAllSessions()).filter((d) => {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    return new Date(d.date) >= thirtyDaysAgo;
+  });
+  if (daily.length < 7) return [];
 
   const patterns: Pattern[] = [];
 
-  // 检测高CPU天是否与高感官天关联
-  let highCpuDays = 0;
-  let highCpuWithSensory = 0;
-
-  days.forEach((d) => {
-    const avgCPU = d.sessions.reduce((s, r) => s + r.brain.thinkingSpeed, 0) / d.sessions.length;
-    const avgSensory = d.sessions.reduce((s, r) =>
-      s + r.sensory.soundOverload + r.sensory.lightOverload + r.sensory.socialOverload + r.sensory.infoOverload, 0
-    ) / d.sessions.length;
-
-    if (avgCPU >= 4) {
+  // 高CPU与高感官的关联
+  let highCpuDays = 0, highCpuWithSensory = 0;
+  daily.forEach((d) => {
+    if (d.thinkingSpeed >= 3.5) {
       highCpuDays++;
-      if (avgSensory >= 8) highCpuWithSensory++;
+      if (d.sensory >= 6) highCpuWithSensory++;
     }
   });
 
-  if (highCpuDays >= 3 && highCpuWithSensory / highCpuDays >= 0.6) {
+  if (highCpuDays >= 3) {
+    const rate = Math.round((highCpuWithSensory / highCpuDays) * 100);
+    if (rate >= 50) {
+      patterns.push({
+        type: 'correlation',
+        title: '高CPU伴随感官负荷',
+        description: `过去30天中，${rate}% 的高思考速度日（≥3.5）同时出现了高感官负荷（≥6）。共 ${highCpuDays} 个高CPU日。`,
+      });
+    }
+  }
+
+  // 检查行为触发频率
+  const behaviorDays = new Map<string, number>();
+  daily.forEach((d) => {
+    d.behaviors.forEach((b) => {
+      behaviorDays.set(b, (behaviorDays.get(b) ?? 0) + 1);
+    });
+  });
+  const top = [...behaviorDays.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
+  if (top.length > 0 && top[0][1] >= 3) {
     patterns.push({
       type: 'correlation',
-      title: '高CPU与感官负荷关联',
-      description: `${Math.round((highCpuWithSensory / highCpuDays) * 100)}% 的高思考速度日同时出现了高感官负荷`,
+      title: '高频行为',
+      description: top.map(([name, count]) => `"${name}" 出现 ${count} 天（${Math.round((count / daily.length) * 100)}%）`).join('\n'),
+    });
+  }
+
+  if (patterns.length === 0) {
+    patterns.push({
+      type: 'correlation',
+      title: '关联数据积累中',
+      description: `过去30天有 ${daily.length} 天数据。随着数据增多，系统将自动发现指标间的关联模式。`,
     });
   }
 
