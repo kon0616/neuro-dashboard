@@ -3,6 +3,7 @@ import { useHistory } from '../../hooks/useHistory';
 import type { DailyRecord } from '../../types';
 import { formatDateFull } from '../../lib/utils';
 import { deleteRecord } from '../../lib/storage';
+import { getBehaviorLabel } from '../../hooks/useBehaviors';
 import {
   Cpu,
   Battery,
@@ -196,7 +197,7 @@ function HistoryCard({
                       key={key}
                       className="inline-block rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] text-blue-400"
                     >
-                      {behaviorLabels[key as keyof typeof behaviorLabels]}
+                      {getBehaviorLabel(key)}
                     </span>
                   ))}
               </div>

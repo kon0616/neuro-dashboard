@@ -7,6 +7,13 @@ import {
   deleteBehaviorDefinition,
 } from '../lib/storage';
 
+/** 独立的行为标签查找（不依赖 React） */
+export function getBehaviorLabel(id: string): string {
+  const defs = getBehaviorDefinitions();
+  const found = defs.find((b) => b.id === id);
+  return found?.label ?? id;
+}
+
 /**
  * 管理行为定义（默认 + 自定义）
  */
@@ -19,7 +26,6 @@ export function useBehaviors() {
   useEffect(() => {
     const saved = getBehaviorDefinitions();
     if (saved.length === 0) {
-      // 首次加载：写入默认行为
       DEFAULT_BEHAVIORS.forEach((b) => saveBehaviorDefinition(b));
       setBehaviors(DEFAULT_BEHAVIORS);
     } else {
@@ -45,10 +51,17 @@ export function useBehaviors() {
   const defaultBehaviors = behaviors.filter((b) => b.isDefault);
   const customBehaviors = behaviors.filter((b) => !b.isDefault);
 
+  /** 根据 ID 查找行为标签 */
+  const getLabel = useCallback(
+    (id: string): string => getBehaviorLabel(id),
+    [behaviors]
+  );
+
   return {
     behaviors,
     defaultBehaviors,
     customBehaviors,
+    getLabel,
     add,
     update,
     remove,

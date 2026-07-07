@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Cpu, Battery, Radio, Zap, Circle, Clock, ChevronDown, ChevronRight } from 'lucide-react';
+import { Cpu, Battery, Radio, ChevronDown, ChevronRight, Circle } from 'lucide-react';
+import { getBehaviorLabel } from '../../hooks/useBehaviors';
 import type { DayRecord } from '../../types/day';
 import type { Session } from '../../types/session';
 import type { AppEvent } from '../../types/event';
@@ -133,7 +134,7 @@ function TimelineNode({ entry, isLast, onDelete }: { entry: TimelineEntry; isLas
             {Object.entries(s.behavior).filter(([, v]) => v).length > 0 && (
               <div className="flex flex-wrap gap-1 pt-1">
                 {Object.entries(s.behavior).filter(([, v]) => v).map(([k]) => (
-                  <span key={k} className="rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] text-blue-400">{k}</span>
+                  <span key={k} className="rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] text-blue-400">{getBehaviorLabel(k)}</span>
                 ))}
               </div>
             )}

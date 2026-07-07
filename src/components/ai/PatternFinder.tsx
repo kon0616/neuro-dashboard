@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { getAllSessions } from '../../lib/storage';
+import { getBehaviorLabel } from '../../hooks/useBehaviors';
 
 type TimeScale = 3 | 7 | 30 | 90 | -1; // -1 = All Time
 
@@ -277,7 +278,7 @@ function findCorrelationPatterns(): Pattern[] {
     patterns.push({
       type: 'correlation',
       title: '高频行为',
-      description: top.map(([name, count]) => `"${name}" 出现 ${count} 天（${Math.round((count / daily.length) * 100)}%）`).join('\n'),
+      description: top.map(([name, count]) => `"${getBehaviorLabel(name)}" 出现 ${count} 天（${Math.round((count / daily.length) * 100)}%）`).join('\n'),
     });
   }
 
@@ -348,7 +349,7 @@ function findSignaturePatterns(): Pattern[] {
       type: 'signature',
       title: 'Top 预警信号',
       description: topBehaviors
-        .map(([name, count], i) => `${i + 1}. ${name}（${count}次）`)
+        .map(([name, count], i) => `${i + 1}. ${getBehaviorLabel(name)}（${count}次）`)
         .join('\n'),
     });
   }

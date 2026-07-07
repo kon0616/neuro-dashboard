@@ -1,6 +1,7 @@
 import { Moon, Calendar, Tag } from 'lucide-react';
 import type { DayRecord } from '../../types/day';
 import { periodLabels } from '../../types/session';
+import { getBehaviorLabel } from '../../hooks/useBehaviors';
 
 interface ObserverProps {
   day: DayRecord | null;
@@ -31,7 +32,7 @@ export function Observer({ day }: ObserverProps) {
   sessions.forEach((s) => {
     Object.entries(s.behavior)
       .filter(([, v]) => v)
-      .forEach(([k]) => allBehaviors.add(k));
+      .forEach(([k]) => allBehaviors.add(getBehaviorLabel(k)));
   });
 
   // 事件列表
