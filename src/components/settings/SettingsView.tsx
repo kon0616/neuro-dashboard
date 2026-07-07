@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ListChecks, Tag, Download, Upload, Trash2 } from 'lucide-react';
 import { useBehaviors } from '../../hooks/useBehaviors';
 import { useEventTypes } from '../../hooks/useEvents';
-import { getAllDays, getAllSessions, getEventTypeDefinitions } from '../../lib/storage';
+import { getAllDays, getAllSessions, getEventTypeDefinitions, getBehaviorDefinitions, getAIConfig, getInsights } from '../../lib/storage';
 import type { BehaviorDefinition } from '../../types/behavior';
 import type { EventTypeDefinition } from '../../types/event';
 
@@ -217,6 +217,10 @@ function DataExport() {
       days,
       sessionCount: sessions.length,
       dayCount: days.length,
+      behaviors: getBehaviorDefinitions(),
+      eventTypes: getEventTypeDefinitions(),
+      aiConfig: getAIConfig(),
+      insights: getInsights(),
     };
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -244,17 +248,53 @@ function DataExport() {
           return;
         }
 
-        // 合并数据：按日期去重，新数据覆盖旧数据
-        const existing = getAllDays();
-        const existingMap = new Map(existing.map((d) => [d.date, d]));
-        data.days.forEach((d: typeof existing[0]) => {
+        // 合并 days
+        const existingDays = getAllDays();
+        const existingMap = new Map(existingDays.map((d) => [d.date, d]));
+        data.days.forEach((d: typeof existingDays[0]) => {
           existingMap.set(d.date, d);
         });
-        const merged = [...existingMap.values()].sort((a, b) => a.date.localeCompare(b.date));
-        localStorage.setItem('neuro-v2-days', JSON.stringify(merged));
+        const mergedDays = [...existingMap.values()].sort((a, b) => a.date.localeCompare(b.date));
+        localStorage.setItem('neuro-v2-days', JSON.stringify(mergedDays));
 
-        const sessionCount = merged.reduce((s, d) => s + d.sessions.length, 0);
-        setImportMsg(`导入成功：${merged.length} 天，${sessionCount} 次签到`);
+        // 合并 behaviors（按 id 去重，导入的覆盖本地）
+        if (data.behaviors && Array.isArray(data.behaviors)) {
+          const existingBehaviors = getBehaviorDefinitions();
+          const behaviorMap = new Map(existingBehaviors.map((b) => [b.id, b]));
+          data.behaviors.forEach((b: typeof existingBehaviors[0]) => {
+            behaviorMap.set(b.id, b);
+          });
+          localStorage.setItem('neuro-v2-behaviors', JSON.stringify([...behaviorMap.values()]));
+        }
+
+        // 合并 event types
+        if (data.eventTypes && Array.isArray(data.eventTypes)) {
+          const existingEvents = getEventTypeDefinitions();
+          const eventMap = new Map(existingEvents.map((e) => [e.id, e]));
+          data.eventTypes.forEach((e: typeof existingEvents[0]) => {
+            eventMap.set(e.id, e);
+          });
+          localStorage.setItem('neuro-v2-event-types', JSON.stringify([...eventMap.values()]));
+        }
+
+        // AI config（有则覆盖）
+        if (data.aiConfig) {
+          localStorage.setItem('neuro-v2-ai-config', JSON.stringify(data.aiConfig));
+        }
+
+        // insights（导入的不覆盖本地，追加合并）
+        if (data.insights && Array.isArray(data.insights)) {
+          const existingInsights = getInsights();
+          const insightIds = new Set(existingInsights.map((i) => i.id));
+          const newInsights = data.insights.filter((i: typeof existingInsights[0]) => !insightIds.has(i.id));
+          localStorage.setItem('neuro-v2-insights', JSON.stringify([...existingInsights, ...newInsights]));
+        }
+
+        const sessionCount = mergedDays.reduce((s, d) => s + d.sessions.length, 0);
+        const behaviorCount = data.behaviors?.length ?? 0;
+        const extra = behaviorCount > 0 ? `，${behaviorCount} 个行为定义` : '';
+        setImportMsg(`导入成功：${mergedDays.length} 天，${sessionCount} 次签到${extra}`);
+        setTimeout(() => window.location.reload(), 1500);
       } catch {
         setImportMsg('文件解析失败，请检查是否为有效的 JSON 备份文件');
       }
