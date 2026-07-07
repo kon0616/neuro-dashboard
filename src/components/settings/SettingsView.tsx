@@ -1,8 +1,11 @@
 import { useState } from 'react';
+import { useMemo } from 'react';
 import { ListChecks, Tag, Download, Upload, Trash2 } from 'lucide-react';
 import { useBehaviors } from '../../hooks/useBehaviors';
 import { useEventTypes } from '../../hooks/useEvents';
 import { getAllDays, getAllSessions, getEventTypeDefinitions, getBehaviorDefinitions, getAIConfig, getInsights } from '../../lib/storage';
+import type { BehaviorDefinition } from '../../types/behavior';
+import type { EventTypeDefinition } from '../../types/event';
 import type { BehaviorDefinition } from '../../types/behavior';
 import type { EventTypeDefinition } from '../../types/event';
 
@@ -51,10 +54,24 @@ export function SettingsView() {
 
 /** 行为管理 */
 function BehaviorManager() {
-  const { behaviors, defaultBehaviors, customBehaviors, add, update, remove } = useBehaviors();
+  const { behaviors, add, update, remove } = useBehaviors();
   const [newLabel, setNewLabel] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState('');
+
+  // 从所有 session 中扫描孤儿行为 ID
+  const orphanIds = useMemo(() => {
+    const defined = new Set(behaviors.map((b) => b.id));
+    const used = new Set<string>();
+    getAllDays().forEach((d) =>
+      d.sessions.forEach((s) =>
+        Object.entries(s.behavior)
+          .filter(([, v]) => v)
+          .forEach(([k]) => used.add(k))
+      )
+    );
+    return [...used].filter((id) => !defined.has(id));
+  }, [behaviors]);
 
   const handleAdd = () => {
     if (!newLabel.trim()) return;
@@ -65,6 +82,15 @@ function BehaviorManager() {
       isDefault: false,
     });
     setNewLabel('');
+  };
+
+  const handleCreateOrphan = (id: string) => {
+    add({
+      id,
+      label: id, // 先填 ID，用户可以编辑
+      category: 'neutral',
+      isDefault: false,
+    });
   };
 
   const handleEdit = (def: BehaviorDefinition) => {
@@ -101,6 +127,24 @@ function BehaviorManager() {
         </button>
       </div>
 
+      {/* 孤儿 ID（session 中有但无定义的） */}
+      {orphanIds.length > 0 && (
+        <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 space-y-1.5">
+          <p className="text-[11px] text-amber-400">发现 {orphanIds.length} 个未定义的行为标签（来自导入的会话数据）：</p>
+          {orphanIds.map((id) => (
+            <div key={id} className="flex items-center gap-2">
+              <code className="flex-1 text-[11px] text-amber-300/70 font-mono truncate">{id}</code>
+              <button
+                onClick={() => handleCreateOrphan(id)}
+                className="text-[11px] text-amber-400 hover:text-amber-300 shrink-0"
+              >
+                创建定义 →
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* 行为列表 */}
       <div className="space-y-1.5">
         {behaviors.map((b) => (
@@ -133,13 +177,11 @@ function BehaviorManager() {
                 }`}>
                   {b.category === 'activation' ? '激活' : b.category === 'shutdown' ? '关闭' : '中性'}
                 </span>
+                <button onClick={() => handleEdit(b)} className="text-xs text-slate-500 hover:text-slate-300">编辑</button>
                 {!b.isDefault && (
-                  <>
-                    <button onClick={() => handleEdit(b)} className="text-xs text-slate-500 hover:text-slate-300">编辑</button>
-                    <button onClick={() => remove(b.id)} className="text-xs text-red-500 hover:text-red-400">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </>
+                  <button onClick={() => remove(b.id)} className="text-xs text-red-500 hover:text-red-400">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
                 )}
               </>
             )}
@@ -154,6 +196,18 @@ function BehaviorManager() {
 function EventTypeManager() {
   const { eventTypes, add, remove } = useEventTypes();
   const [newLabel, setNewLabel] = useState('');
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editVal, setEditVal] = useState('');
+
+  // 扫描孤儿事件 ID
+  const orphanIds = useMemo(() => {
+    const defined = new Set(eventTypes.map((e) => e.id));
+    const used = new Set<string>();
+    getAllDays().forEach((d) =>
+      d.events.forEach((e) => used.add(e.eventTypeId))
+    );
+    return [...used].filter((id) => !defined.has(id));
+  }, [eventTypes]);
 
   const handleAdd = () => {
     if (!newLabel.trim()) return;
@@ -164,6 +218,26 @@ function EventTypeManager() {
       isDefault: false,
     });
     setNewLabel('');
+  };
+
+  const handleCreateOrphan = (id: string) => {
+    add({ id, label: id, icon: 'Circle', isDefault: false });
+  };
+
+  const handleEdit = (et: EventTypeDefinition) => {
+    setEditId(et.id);
+    setEditVal(et.label);
+  };
+
+  const saveEdit = () => {
+    if (!editVal.trim() || !editId) return;
+    const def = eventTypes.find((e) => e.id === editId);
+    if (def) {
+      // 对于 event types 没有 update，先 remove 再 add
+      remove(editId);
+      add({ ...def, label: editVal.trim() });
+    }
+    setEditId(null);
   };
 
   return (
@@ -185,17 +259,49 @@ function EventTypeManager() {
         </button>
       </div>
 
+      {/* 孤儿事件 ID */}
+      {orphanIds.length > 0 && (
+        <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 space-y-1.5">
+          <p className="text-[11px] text-amber-400">发现 {orphanIds.length} 个未定义的事件标签（来自导入数据）：</p>
+          {orphanIds.map((id) => (
+            <div key={id} className="flex items-center gap-2">
+              <code className="flex-1 text-[11px] text-amber-300/70 font-mono truncate">{id}</code>
+              <button
+                onClick={() => handleCreateOrphan(id)}
+                className="text-[11px] text-amber-400 hover:text-amber-300 shrink-0"
+              >
+                创建定义 →
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="space-y-1.5">
         {eventTypes.map((et) => (
           <div key={et.id} className="flex items-center gap-2 rounded-lg bg-panel-hover/50 px-3 py-2">
-            <span className="flex-1 text-sm text-slate-300">{et.label}</span>
-            {et.isDefault && (
-              <span className="rounded bg-panel-border px-1.5 py-0.5 text-[10px] text-slate-500">默认</span>
-            )}
-            {!et.isDefault && (
-              <button onClick={() => remove(et.id)} className="text-xs text-red-500 hover:text-red-400">
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
+            {editId === et.id ? (
+              <>
+                <input
+                  type="text" value={editVal} onChange={(e) => setEditVal(e.target.value)}
+                  className="flex-1 rounded border border-panel-border bg-panel-card px-2 py-1 text-sm text-slate-300 focus:outline-none"
+                  autoFocus onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
+                />
+                <button onClick={saveEdit} className="text-xs text-blue-400">保存</button>
+              </>
+            ) : (
+              <>
+                <span className="flex-1 text-sm text-slate-300">{et.label}</span>
+                {et.isDefault && (
+                  <span className="rounded bg-panel-border px-1.5 py-0.5 text-[10px] text-slate-500">默认</span>
+                )}
+                <button onClick={() => handleEdit(et)} className="text-xs text-slate-500 hover:text-slate-300">编辑</button>
+                {!et.isDefault && (
+                  <button onClick={() => remove(et.id)} className="text-xs text-red-500 hover:text-red-400">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </>
             )}
           </div>
         ))}
