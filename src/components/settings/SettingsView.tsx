@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ListChecks, Tag, Download, Trash2 } from 'lucide-react';
+import { ListChecks, Tag, Download, Upload, Trash2 } from 'lucide-react';
 import { useBehaviors } from '../../hooks/useBehaviors';
 import { useEventTypes } from '../../hooks/useEvents';
 import { getAllDays, getAllSessions, getEventTypeDefinitions } from '../../lib/storage';
@@ -204,13 +204,16 @@ function EventTypeManager() {
   );
 }
 
-/** 数据导出 */
+/** 数据导出/导入 */
 function DataExport() {
+  const [importMsg, setImportMsg] = useState<string | null>(null);
+
   const handleExport = () => {
     const days = getAllDays();
     const sessions = getAllSessions();
     const exportData = {
       exportDate: new Date().toISOString(),
+      version: 2,
       days,
       sessionCount: sessions.length,
       dayCount: days.length,
@@ -222,6 +225,41 @@ function DataExport() {
     a.download = `neuro-dashboard-export-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleImport = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+
+        // 验证最低限度的结构
+        if (!data.days || !Array.isArray(data.days)) {
+          setImportMsg('无效的备份文件：缺少 days 字段');
+          return;
+        }
+
+        // 合并数据：按日期去重，新数据覆盖旧数据
+        const existing = getAllDays();
+        const existingMap = new Map(existing.map((d) => [d.date, d]));
+        data.days.forEach((d: typeof existing[0]) => {
+          existingMap.set(d.date, d);
+        });
+        const merged = [...existingMap.values()].sort((a, b) => a.date.localeCompare(b.date));
+        localStorage.setItem('neuro-v2-days', JSON.stringify(merged));
+
+        const sessionCount = merged.reduce((s, d) => s + d.sessions.length, 0);
+        setImportMsg(`导入成功：${merged.length} 天，${sessionCount} 次签到`);
+      } catch {
+        setImportMsg('文件解析失败，请检查是否为有效的 JSON 备份文件');
+      }
+    };
+    input.click();
   };
 
   const days = getAllDays();
@@ -240,12 +278,30 @@ function DataExport() {
         </div>
       </div>
 
+      {importMsg && (
+        <div className={`rounded-lg px-4 py-3 text-xs ${
+          importMsg.startsWith('导入成功')
+            ? 'bg-green-500/10 border border-green-500/20 text-green-400'
+            : 'bg-red-500/10 border border-red-500/20 text-red-400'
+        }`}>
+          {importMsg}
+        </div>
+      )}
+
       <button
         onClick={handleExport}
         className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 py-3 font-medium text-sm hover:bg-blue-500/20 transition-colors min-h-touch"
       >
         <Download className="h-4 w-4" />
         导出全部数据 (JSON)
+      </button>
+
+      <button
+        onClick={handleImport}
+        className="w-full flex items-center justify-center gap-2 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 py-3 font-medium text-sm hover:bg-green-500/20 transition-colors min-h-touch"
+      >
+        <Upload className="h-4 w-4" />
+        导入备份数据
       </button>
     </div>
   );
