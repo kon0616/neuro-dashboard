@@ -1,11 +1,8 @@
-import { useState } from 'react';
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { ListChecks, Tag, Download, Upload, Trash2 } from 'lucide-react';
 import { useBehaviors } from '../../hooks/useBehaviors';
 import { useEventTypes } from '../../hooks/useEvents';
 import { getAllDays, getAllSessions, getEventTypeDefinitions, getBehaviorDefinitions, getAIConfig, getInsights } from '../../lib/storage';
-import type { BehaviorDefinition } from '../../types/behavior';
-import type { EventTypeDefinition } from '../../types/event';
 import type { BehaviorDefinition } from '../../types/behavior';
 import type { EventTypeDefinition } from '../../types/event';
 
