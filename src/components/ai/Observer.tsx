@@ -2,6 +2,7 @@ import { Moon, Calendar, Tag } from 'lucide-react';
 import type { DayRecord } from '../../types/day';
 import { periodLabels } from '../../types/session';
 import { getBehaviorLabel } from '../../hooks/useBehaviors';
+import { getEventLabel } from '../../hooks/useEvents';
 
 interface ObserverProps {
   day: DayRecord | null;
@@ -36,7 +37,7 @@ export function Observer({ day }: ObserverProps) {
   });
 
   // 事件列表
-  const eventLabels = events.map((e) => e.eventTypeId);
+  const eventLabels = events.map((e) => getEventLabel(e.eventTypeId));
 
   return (
     <div className="space-y-4">

@@ -10,6 +10,13 @@ import {
   getDay,
 } from '../lib/storage';
 
+/** 独立的事件标签查找（不依赖 React） */
+export function getEventLabel(id: string): string {
+  const defs = getEventTypeDefinitions();
+  const found = defs.find((e) => e.id === id);
+  return found?.label ?? id;
+}
+
 /**
  * 管理事件类型定义
  */

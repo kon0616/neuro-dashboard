@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import type { DayRecord } from '../types/day';
 import type { Session } from '../types/session';
 import type { AppEvent } from '../types/event';
-import { getEventTypeDefinitions } from '../lib/storage';
+import { getEventLabel } from './useEvents';
 
 /** 时间线条目 */
 export type TimelineEntry =
@@ -16,22 +16,16 @@ export function useTimeline(day: DayRecord | null) {
   return useMemo(() => {
     if (!day) return [];
 
-    const eventTypes = getEventTypeDefinitions();
-    const eventTypeMap = new Map(eventTypes.map((e) => [e.id, e]));
-
     const entries: TimelineEntry[] = [
       ...day.sessions.map(
         (s) => ({ kind: 'session' as const, data: s })
       ),
-      ...day.events.map((e) => {
-        const typeDef = eventTypeMap.get(e.eventTypeId);
-        return {
-          kind: 'event' as const,
-          data: e,
-          label: typeDef?.label ?? e.eventTypeId,
-          icon: typeDef?.icon ?? 'Circle',
-        };
-      }),
+      ...day.events.map((e) => ({
+        kind: 'event' as const,
+        data: e,
+        label: getEventLabel(e.eventTypeId),
+        icon: 'Circle',
+      })),
     ];
 
     entries.sort(
