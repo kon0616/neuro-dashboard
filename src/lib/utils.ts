@@ -52,11 +52,17 @@ export function getLevelColor(value: number, max: number = 5): string {
   return 'text-red-400';
 }
 
-/** 规范化 API URL：自动补全 https:// */
+/** 规范化 API URL：自动补全 https:// 和默认路径 */
 export function normalizeUrl(url: string): string {
   if (!url) return url;
-  if (!url.startsWith('http://') && !url.startsWith('https://')) {
-    return 'https://' + url;
+  let result = url;
+  if (!result.startsWith('http://') && !result.startsWith('https://')) {
+    result = 'https://' + result;
   }
-  return url;
+  // 如果只填了域名没带路径，自动补全 OpenAI 兼容路径
+  const withoutProtocol = result.replace(/^https?:\/\//, '');
+  if (!withoutProtocol.includes('/')) {
+    result = result.replace(/\/?$/, '/v1/chat/completions');
+  }
+  return result;
 }
