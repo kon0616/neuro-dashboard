@@ -76,7 +76,7 @@ export function migrateV1ToV2(): void {
     }
 
     // 迁移每条 v1 记录为单个 Morning 会话
-    const days: DayRecord[] = v1Records.map((r) => {
+    const v1Days: DayRecord[] = v1Records.map((r) => {
       const session: Session = {
         ...createEmptySession(`${r.date}T09:00:00`),
         brain: {
@@ -107,8 +107,20 @@ export function migrateV1ToV2(): void {
       };
     });
 
-    // 写入 v2 格式
-    localStorage.setItem('neuro-v2-days', JSON.stringify(days));
+    // 安全合并：如果已有 v2 数据，v2 优先，v1 只填补缺失日期
+    const existingV2Raw = localStorage.getItem('neuro-v2-days');
+    let existingV2: DayRecord[] = [];
+    if (existingV2Raw) {
+      try { existingV2 = JSON.parse(existingV2Raw); } catch { /* ignore */ }
+    }
+    const merged = new Map<string, DayRecord>();
+    // v1 数据先放入（低优先级）
+    v1Days.forEach((d) => merged.set(d.date, d));
+    // v2 数据覆盖（高优先级）
+    existingV2.forEach((d) => merged.set(d.date, d));
+    const sorted = [...merged.values()].sort((a, b) => a.date.localeCompare(b.date));
+
+    localStorage.setItem('neuro-v2-days', JSON.stringify(sorted));
     initializeV2Defaults();
 
     // 保留 v1 数据作为备份（不删除）

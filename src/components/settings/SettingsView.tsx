@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
-import { ListChecks, Tag, Download, Upload, Trash2 } from 'lucide-react';
+import { ListChecks, Tag, Download, Upload, Trash2, RefreshCw } from 'lucide-react';
 import { useBehaviors } from '../../hooks/useBehaviors';
 import { useEventTypes } from '../../hooks/useEvents';
 import { getAllDays, getAllSessions, getEventTypeDefinitions, getBehaviorDefinitions, getAIConfig, getInsights } from '../../lib/storage';
+import { tryRecoverFromV1 } from '../../lib/recovery';
 import type { BehaviorDefinition } from '../../types/behavior';
 import type { EventTypeDefinition } from '../../types/event';
 
@@ -445,6 +446,22 @@ function DataExport() {
       >
         <Upload className="h-4 w-4" />
         导入备份数据
+      </button>
+
+      <button
+        onClick={() => {
+          const result = tryRecoverFromV1();
+          if (result.recovered > 0) {
+            setImportMsg(`从 v1 备份恢复了 ${result.recovered} 天数据（跳过 ${result.skipped} 天已存在的）。页面将刷新。`);
+            setTimeout(() => window.location.reload(), 2000);
+          } else {
+            setImportMsg('未找到可恢复的 v1 备份数据。');
+          }
+        }}
+        className="w-full flex items-center justify-center gap-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 py-2 font-medium text-xs hover:bg-amber-500/20 transition-colors min-h-touch"
+      >
+        <RefreshCw className="h-3.5 w-3.5" />
+        从 v1 备份恢复数据
       </button>
     </div>
   );
