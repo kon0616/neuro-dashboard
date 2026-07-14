@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Calendar, History } from 'lucide-react';
 import { useDay } from '../../hooks/useDay';
 import { useCurrentSession } from '../../hooks/useSessions';
 import { useBehaviors } from '../../hooks/useBehaviors';
@@ -11,26 +11,36 @@ import { DailyDifference } from './DailyDifference';
 import { DailySleep } from './DailySleep';
 import { TodaySummary } from './TodaySummary';
 import { RiskPanel } from '../risk/RiskPanel';
-import { getToday } from '../../lib/utils';
+import { getToday, formatDateFull } from '../../lib/utils';
 
 /**
- * v2 仪表盘 — 多时段签到 + 独立睡眠卡片
+ * v2 仪表盘 — 支持选择任意日期补充记录
  */
 export function Dashboard() {
   const today = getToday();
-  const { day, isLoaded, addSession, deleteSession, setDifference, refresh } = useDay(today);
+  const [selectedDate, setSelectedDate] = useState(today);
+  const isToday = selectedDate === today;
+
+  const { day, isLoaded, addSession, deleteSession, setDifference } = useDay(selectedDate);
   const { session, updateBrain, updateBody, updateSensory, updateEnvironment, toggleBehavior, setNote, setPeriod, save } =
-    useCurrentSession(today);
+    useCurrentSession(selectedDate);
   const { behaviors } = useBehaviors();
   const { eventTypes } = useEventTypes();
-  const { logEvent } = useDayEvents(today);
+  const { logEvent } = useDayEvents(selectedDate);
 
   const { risks } = useRiskDetection(day.sessions);
 
   const [showForm, setShowForm] = useState(false);
 
-  // 睡眠状态（日级别）
-  const [sleep, setSleepState] = useState(() => getSleep(today));
+  // 睡眠状态
+  const [sleep, setSleepState] = useState(() => getSleep(selectedDate));
+
+  // 日期变更时刷新睡眠
+  const handleDateChange = (d: string) => {
+    setSelectedDate(d);
+    setShowForm(false);
+    setSleepState(getSleep(d));
+  };
 
   if (!isLoaded) {
     return (
@@ -47,15 +57,13 @@ export function Dashboard() {
   };
 
   const handleSleepHours = (hours: number) => {
-    setSleep(today, hours, sleep.quality);
+    setSleep(selectedDate, hours, sleep.quality);
     setSleepState({ ...sleep, hours });
-    refresh();
   };
 
   const handleSleepQuality = (quality: number) => {
-    setSleep(today, sleep.hours, quality);
+    setSleep(selectedDate, sleep.hours, quality);
     setSleepState({ ...sleep, quality });
-    refresh();
   };
 
   const handleLogEvent = (eventTypeId: string) => {
@@ -64,6 +72,36 @@ export function Dashboard() {
 
   return (
     <div className="space-y-4 pb-4">
+      {/* 日期选择器 */}
+      <div className="flex items-center gap-2">
+        <input
+          type="date"
+          value={selectedDate}
+          max={today}
+          onChange={(e) => handleDateChange(e.target.value)}
+          className="flex-1 rounded-lg border border-panel-border bg-panel-hover px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-blue-500/50 [color-scheme:dark]"
+        />
+        <button
+          onClick={() => handleDateChange(today)}
+          className={`shrink-0 rounded-lg px-3 py-2 text-xs transition-colors min-h-touch ${
+            isToday
+              ? 'bg-blue-500/20 text-blue-400'
+              : 'bg-panel-hover text-slate-500 hover:text-slate-300'
+          }`}
+        >
+          今天
+        </button>
+      </div>
+
+      {!isToday && (
+        <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 flex items-center gap-2">
+          <History className="h-4 w-4 text-amber-400 shrink-0" />
+          <p className="text-xs text-amber-400">
+            正在补充 <span className="font-medium">{formatDateFull(selectedDate)}</span> 的记录
+          </p>
+        </div>
+      )}
+
       {/* 风险检测 */}
       {risks.length > 0 && <RiskPanel risks={risks} />}
       {risks.length === 0 && day.sessions.length > 0 && (
@@ -74,7 +112,7 @@ export function Dashboard() {
         </div>
       )}
 
-      {/* 睡眠卡片 — 每天一次 */}
+      {/* 睡眠卡片 */}
       <DailySleep
         hours={sleep.hours}
         quality={sleep.quality}
@@ -128,9 +166,9 @@ export function Dashboard() {
       {/* 空状态 */}
       {day.sessions.length === 0 && !showForm && (
         <div className="flex flex-col items-center justify-center py-12 text-center">
-          <p className="font-mono text-sm text-slate-500">还没有今天的记录</p>
+          <p className="font-mono text-sm text-slate-500">当天还没有记录</p>
           <p className="mt-1 text-xs text-slate-600">
-            点击上方按钮开始第一次签到
+            点击上方按钮{isToday ? '开始第一次签到' : '补充当天记录'}
           </p>
         </div>
       )}

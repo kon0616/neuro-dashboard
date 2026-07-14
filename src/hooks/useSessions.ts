@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { Session } from '../types/session';
 import { createEmptySession } from '../types/session';
 import {
@@ -15,6 +15,11 @@ import { getToday } from '../lib/utils';
  */
 export function useCurrentSession(date: string = getToday()) {
   const [session, setSession] = useState<Session>(() => createEmptySession());
+
+  // 日期切换时重置表单
+  useEffect(() => {
+    setSession(createEmptySession());
+  }, [date]);
 
   const newSession = useCallback(() => {
     setSession(createEmptySession());
