@@ -59,8 +59,8 @@ function detectActivation(
     type: 'activation',
     message:
       level === 'caution'
-        ? '多项指标显示神经系统处于高度激活状态。考虑放慢节奏。'
-        : '检测到可能的激活趋势。注意休息和节奏。',
+        ? 'CPU 偏高、睡眠偏少、项目变多——几种信号同时出现了。可以试试今天放慢一点节奏。'
+        : 'CPU 和活跃度看起来比平时高。注意休息，不需要过度反应——先观察。',
     indicators: uniqueIndicators,
     sourceSessionIds: uniqueIds,
   };
@@ -123,8 +123,8 @@ function detectShutdown(
     type: 'shutdown',
     message:
       level === 'caution'
-        ? '多项指标提示能量处于低位。给自己多一些空间和休息。'
-        : '检测到能量可能下降。关注自己当下的需求。',
+        ? '精力偏低、CPU 变慢、不太想沟通——身体可能在说需要休息了。给自己一些空间。'
+        : '精力好像比平时低一些。如果持续的话，可能需要少安排点事情。',
     indicators: uniqueIndicators,
     sourceSessionIds: uniqueIds,
   };
@@ -166,8 +166,8 @@ function detectSensoryOverload(sessions: Session[]): RiskResult | null {
     type: 'sensory_overload',
     message:
       level === 'warning'
-        ? '感官系统负担较重。减少刺激可能有所帮助。'
-        : '有轻微感官过载迹象。',
+        ? '声音、光线或信息可能让感官负担比较重。找个安静的地方待一会儿可能会有帮助。'
+        : '有一些感官不太舒服的信号。可以留意一下周围环境。',
     indicators: uniqueIndicators,
     sourceSessionIds: uniqueIds,
   };
